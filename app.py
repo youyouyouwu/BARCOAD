@@ -9,9 +9,9 @@ import os
 
 def make_label_50x30(sku, title, spec):
     """
-    生成 LxU 专属 50x30mm 高清标签 (智能紧凑版)
-    - 动态行距：三行时自动压缩间距，增强整体感
-    - 维持权重：入库码(中)、品名(粗)、规格(暴力加粗)
+    生成 LxU 专属 50x30mm 高清标签 (视觉精修版)
+    - 三行模式行间距设为 1.01，平衡紧凑度与清晰度
+    - 维持品牌视觉规范：入库码(中)、品名(粗)、规格(暴力加粗)
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
@@ -41,14 +41,14 @@ def make_label_50x30(sku, title, spec):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    # 入库码：常规体双层叠加 (权重中等)
+    # 入库码数字：位置 270 紧贴条形码
     f_sku = load_font(68, is_bold=False)
     sku_pos = (500, 270)
     draw.text(sku_pos, sku, fill='black', font=f_sku, anchor="mm")
     draw.text((sku_pos[0] + 1, sku_pos[1]), sku, fill='black', font=f_sku, anchor="mm")
 
     # --- 2. 底部声明区 ---
-    # MADE IN CHINA 保持底部居中
+    # MADE IN CHINA 居中，字号 32
     f_bottom = load_font(32, is_bold=False)
     draw.text((500, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
@@ -58,7 +58,7 @@ def make_label_50x30(sku, title, spec):
         display_text = f"{title} / {spec.strip()}"
     
     max_text_width = 900 
-    font_size = 78 # 起步字号
+    font_size = 78 
     wrapped_lines = []
     final_font_bold = None
 
@@ -100,10 +100,9 @@ def make_label_50x30(sku, title, spec):
             break
         font_size -= 2 
 
-    # 💡 核心优化：动态调整行间距
-    # 三行时倍率设为 1.02，两行或单行设为 1.10
+    # 💡 核心微调：三行模式行间距设为 1.01
     if len(wrapped_lines) >= 3:
-        multiplier = 1.02
+        multiplier = 1.01
     else:
         multiplier = 1.10
         
@@ -114,7 +113,7 @@ def make_label_50x30(sku, title, spec):
     current_y = start_y
     for line in wrapped_lines:
         if " / " in line:
-            # 规格强化：四重暴力加粗
+            # 规格参数四重暴力加粗
             parts = line.split(" / ", 1)
             total_w = draw.textbbox((0,0), line, font=final_font_bold)[2]
             start_x = 500 - (total_w / 2)
@@ -136,13 +135,13 @@ def make_label_50x30(sku, title, spec):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.info("💡 **排版优化**：三行模式下自动压缩行距，确保文字紧凑不散乱。")
+st.info("💡 **精细调优版**：三行模式行间距已调至 1.01，确保长标题在极致紧凑下依然清晰。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
     st.markdown("### 📝 输入商品信息")
-    # 文案已更新为“入库码”
+    # 字段名已更新为“入库码”
     v_sku = st.text_input("入库码", "S0033507379541")
     v_title = st.text_input("韩文品名", "[LxU] 용접돋보기 고글형 확대경")
     v_spec = st.text_input("规格参数 (Option)", "1.00배율 2개입")
@@ -154,21 +153,20 @@ with col2:
     st.markdown("### 🖨️ 预览与下载")
     if generate_btn or 'l_img' not in st.session_state:
         if v_sku and v_title:
-            with st.spinner("智能排版调优中..."):
+            with st.spinner("智能排版微调中..."):
                 st.session_state.l_img = make_label_50x30(v_sku, v_title, v_spec)
         else:
             st.warning("请填写完整的入库码和品名！")
 
     if 'l_img' in st.session_state:
-        # 高清 300DPI 预览
-        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 紧凑自适应版)", use_column_width=True)
+        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 极致紧凑精修版)", use_column_width=True)
         
         # PNG 下载
         png_buf = io.BytesIO()
         st.session_state.l_img.save(png_buf, format="PNG", dpi=(300, 300))
-        st.download_button("📥 下载标签 (PNG 图片)", png_buf.getvalue(), f"LxU_Label_{v_sku}.png", use_container_width=True)
+        st.download_button("📥 下载标签 (PNG)", png_buf.getvalue(), f"LxU_Label_{v_sku}.png", use_container_width=True)
         
         # PDF 下载
         pdf_buf = io.BytesIO()
         st.session_state.l_img.save(pdf_buf, format="PDF", resolution=300.0)
-        st.download_button("📥 下载标签 (PDF 文档)", pdf_buf.getvalue(), f"LxU_Label_{v_sku}.pdf", use_container_width=True)
+        st.download_button("📥 下载标签 (PDF)", pdf_buf.getvalue(), f"LxU_Label_{v_sku}.pdf", use_container_width=True)
