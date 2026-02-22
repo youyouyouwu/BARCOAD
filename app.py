@@ -9,41 +9,34 @@ import os
 
 def make_label_50x30(sku, title, spec, remark):
     """
-    生成 LxU 专属 50x30mm 高清标签 (备注独立版)
-    - MADE IN CHINA 上移至 Y=535 居中
-    - 仓库备注独占最右下角 (Y=575, 右对齐)，方便后期切割
+    生成 LxU 专属 50x30mm 高清标签 (同行布局版)
+    - 产地标与备注归于底行 (Y=575)，释放中部空间
+    - 字体：优先思源黑体/雅黑细体，确保全字符不乱码
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
     draw = ImageDraw.Draw(img)
 
     def load_font(size, is_bold=False):
-        # 💡 黄金自适应路径库：优先寻找思源黑体(Noto)和微软细体
-        # 每个路径都显式指定 index=0 以确保 TTC 集合正确加载
         font_candidates = [
-            # 1. Streamlit Cloud 线上路径 (packages.txt 安装位置)
+            # 1. 线上 Linux (Noto Sans CJK)
             {"path": "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc", "index": 0},
             {"path": "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "index": 0},
-            
-            # 2. 本地 Windows 路径 (微软雅黑细体系列)
+            # 2. 本地 Windows (雅黑细体)
             {"path": "C:/Windows/Fonts/msyhl.ttc", "index": 0},
             {"path": "C:/Windows/Fonts/msyh.ttc", "index": 0},
-            
-            # 3. 韩国语专用路径 (保底)
+            # 3. 韩国语保底
             {"path": "/usr/share/fonts/truetype/nanum/NanumGothic.ttf", "index": 0},
-            {"path": "C:/Windows/Fonts/malgun.ttf", "index": 0},
             {"path": "Arial.ttf", "index": 0}
         ]
-
         for cfg in font_candidates:
             if os.path.exists(cfg["path"]):
                 try:
                     return ImageFont.truetype(cfg["path"], size, index=cfg["index"])
-                except:
-                    continue
+                except: continue
         return ImageFont.load_default()
 
-    # --- 1. 扫码区 (Barcode + 入库码) ---
+    # --- 1. 扫码区 ---
     try:
         code_factory = barcode.get_barcode_class('code128')
         c128 = code_factory(sku, writer=ImageWriter())
@@ -53,21 +46,23 @@ def make_label_50x30(sku, title, spec, remark):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    # 入库码：自适应细体单层渲染
+    # 入库码 (Y=270, 细体双层渲染)
     f_sku = load_font(68, is_bold=False)
     draw.text((500, 270), sku, fill='black', font=f_sku, anchor="mm")
 
-    # --- 2. 底部声明与仓库备注区 (分层布局) ---
+    # --- 2. 底部功能区 (同行显示) ---
     f_bottom = load_font(32, is_bold=False)
     
-    # A. 居中的产地标识 (上移至 Y=535，不与备注同行)
-    draw.text((500, 535), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
+    # 💡 核心改动：产地标与备注全部锁定在 Y=575
+    # A. 产地标识：保持中心地位
+    draw.text((500, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
-    # B. 仓库备注 (沉底至 Y=575，右对齐 anchor="rm")
+    # B. 仓库备注：靠右侧显示 (右对齐)，不干扰产地标
     if remark.strip():
+        # X=950 确保不贴边，anchor="rm" 确保向左延伸
         draw.text((950, 575), remark, fill='black', font=f_bottom, anchor="rm")
 
-    # --- 3. 核心信息区 (自适应 1-3 行，保持不变) ---
+    # --- 3. 核心信息区 (智能 1-3 行自适应) ---
     display_text = title
     if spec.strip():
         display_text = f"{title} / {spec.strip()}"
@@ -85,7 +80,8 @@ def make_label_50x30(sku, title, spec, remark):
         if get_w(display_text) <= max_text_width:
             wrapped_lines = [display_text]; final_font_light = f_l; break
         
-        # 智能切分逻辑 (1.01 极致间距)
+        # 智能两行/三行切分 (1.01 紧凑间距)
+        # (此处逻辑自动执行 best_2 和 best_3 寻找最均衡排版)
         best_2 = None
         for i in range(1, len(words)):
             l1, l2 = " ".join(words[:i]), " ".join(words[i:])
@@ -105,7 +101,7 @@ def make_label_50x30(sku, title, spec, remark):
         if best_3: wrapped_lines = best_3[1]; final_font_light = f_l; break
         font_size -= 2 
 
-    # 渲染逻辑
+    # 渲染品名与规格
     multiplier = 1.01 if len(wrapped_lines) >= 3 else 1.10
     line_height = int(font_size * multiplier)
     current_y = 422 - ((len(wrapped_lines) * line_height) / 2) + (line_height / 2)
@@ -118,7 +114,7 @@ def make_label_50x30(sku, title, spec, remark):
             draw.text((sx, current_y), parts[0], fill='black', font=final_font_light, anchor="lm")
             sw = draw.textbbox((0,0), parts[0], font=final_font_light)[2]
             spec_t = " / " + parts[1]
-            # 暴力加粗渲染规格
+            # 规格暴力加粗
             for dx, dy in [(0,0), (1,0), (0,1), (1,1)]:
                 draw.text((sx+sw+dx, current_y+dy), spec_t, fill='black', font=final_font_light, anchor="lm")
         else:
@@ -131,7 +127,7 @@ def make_label_50x30(sku, title, spec, remark):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.success("✅ **布局优化**：仓库备注已独立至右下角，与 MADE IN CHINA 分行显示，方便切割。")
+st.success("✅ **空间优化完成**：产地标与备注已合并至最底行，中部信息区已获得最大显示空间。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
@@ -152,8 +148,8 @@ with col2:
             st.warning("请填写完整的入库码和品名！")
 
     if 'l_img' in st.session_state:
-        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 备注独立版)", use_column_width=True)
-        # 下载区域 (PNG/PDF)
+        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 空间最大化版)", use_column_width=True)
+        # 下载
         p_buf = io.BytesIO(); st.session_state.l_img.save(p_buf, format="PNG", dpi=(300, 300))
         st.download_button("📥 下载标签 (PNG)", p_buf.getvalue(), f"LxU_{v_sku}.png", use_container_width=True)
         pdf_buf = io.BytesIO(); st.session_state.l_img.save(pdf_buf, format="PDF", resolution=300.0)
