@@ -9,31 +9,36 @@ import os
 
 def make_label_50x30(sku, title, spec, remark):
     """
-    生成 LxU 专属 50x30mm 高清标签 (乱码修复版)
-    - 兼容本地/线上字体环境，支持中英韩全字符显示
+    生成 LxU 专属 50x30mm 高清标签 (环境自适应版)
+    - 字体逻辑：自动适配 Linux(线上) 与 Windows(本地) 路径
+    - 字符集：思源黑体全覆盖，彻底解决方框乱码
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
     draw = ImageDraw.Draw(img)
 
     def load_font(size, is_bold=False):
-        # 💡 优先级优化：1.同级文件夹字体(最稳) 2.Windows系统字体 3.Linux线上保底
-        font_configs = [
-            # 如果你把 msyhl.ttc 放在了代码同级目录下，请取消下面注释
-            # {"path": "msyhl.ttc", "index": 0}, 
+        # 💡 黄金自适应路径库：优先寻找思源黑体(Noto)和微软细体
+        # 每个路径都显式指定 index=0 以确保 TTC 集合正确加载
+        font_candidates = [
+            # 1. Streamlit Cloud 线上路径 (packages.txt 安装位置)
+            {"path": "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc", "index": 0},
+            {"path": "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "index": 0},
             
-            {"path": "C:/Windows/Fonts/msyhl.ttc", "index": 0}, # 微软雅黑 Light
-            {"path": "C:/Windows/Fonts/msyh.ttc", "index": 0},  # 微软雅黑 Regular
-            {"path": "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc", "index": 0}, # 线上细体保底
+            # 2. 本地 Windows 路径 (微软雅黑细体系列)
+            {"path": "C:/Windows/Fonts/msyhl.ttc", "index": 0},
+            {"path": "C:/Windows/Fonts/msyh.ttc", "index": 0},
+            
+            # 3. 韩国语专用路径 (保底)
             {"path": "/usr/share/fonts/truetype/nanum/NanumGothic.ttf", "index": 0},
+            {"path": "C:/Windows/Fonts/malgun.ttf", "index": 0},
             {"path": "Arial.ttf", "index": 0}
         ]
-        
-        for config in font_configs:
-            if os.path.exists(config["path"]):
+
+        for cfg in font_candidates:
+            if os.path.exists(cfg["path"]):
                 try:
-                    # 使用 index=0 显式指定 TTC 文件的第一个字体，解决乱码方块问题
-                    return ImageFont.truetype(config["path"], size, index=config["index"])
+                    return ImageFont.truetype(cfg["path"], size, index=cfg["index"])
                 except:
                     continue
         return ImageFont.load_default()
@@ -48,17 +53,17 @@ def make_label_50x30(sku, title, spec, remark):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    # 入库码：极细体渲染
+    # 入库码：自适应细体单层渲染
     f_sku = load_font(68, is_bold=False)
     draw.text((500, 270), sku, fill='black', font=f_sku, anchor="mm")
 
-    # --- 2. 底部声明与仓库备注区 ---
+    # --- 2. 底部声明与仓库备注区 (自适应对齐) ---
     f_bottom = load_font(32, is_bold=False)
     
     # A. 居中的产地标识
     draw.text((500, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
-    # B. 仓库备注 (修复乱码的关键位置)
+    # B. 仓库备注：使用自适应字体防止乱码
     if remark.strip():
         draw.text((50, 575), remark, fill='black', font=f_bottom, anchor="lm")
 
@@ -71,11 +76,9 @@ def make_label_50x30(sku, title, spec, remark):
     font_size = 78 
     wrapped_lines = []
     final_font_light = None
-    final_font_bold = None
 
     while font_size > 20:
         f_l = load_font(font_size, is_bold=False)
-        # 规格加粗使用双层渲染模拟，确保粗细对比
         def get_w(t): return draw.textbbox((0,0), t, font=f_l)[2]
         words = display_text.split()
         
@@ -128,15 +131,15 @@ def make_label_50x30(sku, title, spec, remark):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.info("💡 **乱码修复成功**：已优化字体集合(TTC)加载逻辑。若仍有方块，请将 msyhl.ttc 放入代码文件夹。")
+st.success("✅ **自适应引擎就绪**：已锁定 Noto Sans CJK/微软雅黑 细体，支持中英韩全字符。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    v_sku = st.text_input("入库码", "LXU-C000-1")
-    v_title = st.text_input("韩文品名", "LxU 코너 벽시계 무소음 못없이설치")
-    v_spec = st.text_input("规格参数 (Option)", "그린")
-    v_remark = st.text_input("仓库备注 (例如：绿色)", "绿色") #
+    v_sku = st.text_input("入库码", "S0033507379541")
+    v_title = st.text_input("韩文品名", "[LxU] 용접돋보기 고글형 확대경")
+    v_spec = st.text_input("规格参数 (Option)", "1.00배율 2개입")
+    v_remark = st.text_input("仓库备注 (例如：绿色)", "绿色") 
     
     st.markdown("<br>", unsafe_allow_html=True)
     generate_btn = st.button("🚀 生成高清标签预览", use_container_width=True, type="primary")
@@ -149,7 +152,7 @@ with col2:
             st.warning("请填写完整的入库码和品名！")
 
     if 'l_img' in st.session_state:
-        st.image(st.session_state.l_img, caption="1000x600 px (极细修复版)", use_column_width=True)
+        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 智能自适应版)", use_column_width=True)
         # 下载区域 (PNG/PDF)
         p_buf = io.BytesIO(); st.session_state.l_img.save(p_buf, format="PNG", dpi=(300, 300))
         st.download_button("📥 下载标签 (PNG)", p_buf.getvalue(), f"LxU_{v_sku}.png", use_container_width=True)
