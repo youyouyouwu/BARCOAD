@@ -9,9 +9,10 @@ import os
 
 def make_label_50x30(sku, title, spec):
     """
-    生成 LxU 专属 50x30mm 高清标签 (居中回归 & 暴力加粗版)
-    - 声明区：MADE IN CHINA 回归底部居中
-    - 信息区：规格参数采用四重叠加暴力加粗，视觉显著增强
+    生成 LxU 专属 50x30mm 高清标签 (权重精修版)
+    - 数字编码：由粗体改为常规体双层叠加 (中等粗细)
+    - 商品名称：保持原生粗体 (标准粗细)
+    - 规格参数：保持四重叠加 (极粗)
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
@@ -41,11 +42,15 @@ def make_label_50x30(sku, title, spec):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    f_sku = load_font(68, is_bold=True)
-    draw.text((500, 270), sku, fill='black', font=f_sku, anchor="mm")
+    # SKU：使用 Regular 字体进行双层叠加渲染 (比之前细一点，但比底部粗)
+    f_sku = load_font(68, is_bold=False)
+    sku_pos = (500, 270)
+    # 第一层
+    draw.text(sku_pos, sku, fill='black', font=f_sku, anchor="mm")
+    # 第二层 (右移1像素，模拟中等粗细)
+    draw.text((sku_pos[0] + 1, sku_pos[1]), sku, fill='black', font=f_sku, anchor="mm")
 
-    # --- 💡 板块三：底部声明区 (回归居中) ---
-    # 💡 核心修改：X坐标回归 500，anchor回归 mm (居中对齐)
+    # --- 💡 板块三：底部声明区 (居中细体) ---
     f_bottom = load_font(32, is_bold=False)
     draw.text((500, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
@@ -57,15 +62,17 @@ def make_label_50x30(sku, title, spec):
     max_text_width = 880 
     font_size = 78 
     wrapped_lines = []
-    final_font = None
+    final_font_bold = None
+    final_font_reg = None
 
     while font_size > 22:
-        f_test = load_font(font_size, is_bold=True)
-        def get_w(t): return draw.textbbox((0,0), t, font=f_test)[2]
+        f_test_bold = load_font(font_size, is_bold=True)
+        def get_w(t): return draw.textbbox((0,0), t, font=f_test_bold)[2]
         
         if get_w(display_text) <= max_text_width:
             wrapped_lines = [display_text]
-            final_font = f_test
+            final_font_bold = f_test_bold
+            final_font_reg = load_font(font_size, is_bold=False)
             break
             
         words = display_text.split()
@@ -79,13 +86,10 @@ def make_label_50x30(sku, title, spec):
         
         if best_split:
             wrapped_lines = best_split[1]
-            final_font = f_test
+            final_font_bold = f_test_bold
+            final_font_reg = load_font(font_size, is_bold=False)
             break
         font_size -= 2 
-
-    if not wrapped_lines:
-        final_font = load_font(30, is_bold=True)
-        wrapped_lines = [display_text]
 
     line_height = int(font_size * 1.12)
     center_y_area = 420 
@@ -95,29 +99,26 @@ def make_label_50x30(sku, title, spec):
     for line in wrapped_lines:
         if " / " in line:
             parts = line.split(" / ", 1)
-            total_w = draw.textbbox((0,0), line, font=final_font)[2]
+            total_w = draw.textbbox((0,0), line, font=final_font_bold)[2]
             start_x = 500 - (total_w / 2)
             
-            # 产品品名：标准粗体渲染 (单层)
+            # 产品品名：标准粗体 (单层)
             name_text = parts[0]
-            draw.text((start_x, current_y), name_text, fill='black', font=final_font, anchor="lm")
+            draw.text((start_x, current_y), name_text, fill='black', font=final_font_bold, anchor="lm")
             
-            slash_w = draw.textbbox((0,0), name_text, font=final_font)[2]
+            slash_w = draw.textbbox((0,0), name_text, font=final_font_bold)[2]
             
-            # 💡 规格参数：四重暴力加粗渲染 (原位+右+下+右下)
+            # 规格参数：四重暴力加粗渲染
             spec_text = " / " + parts[1]
             spec_x = start_x + slash_w
             spec_y = current_y
-            # Pass 1: 原位
-            draw.text((spec_x, spec_y), spec_text, fill='black', font=final_font, anchor="lm")
-            # Pass 2: 右移1像素
-            draw.text((spec_x + 1, spec_y), spec_text, fill='black', font=final_font, anchor="lm")
-            # Pass 3: 下移1像素
-            draw.text((spec_x, spec_y + 1), spec_text, fill='black', font=final_font, anchor="lm")
-             # Pass 4: 右下移1像素 (增强对角线壮实感)
-            draw.text((spec_x + 1, spec_y + 1), spec_text, fill='black', font=final_font, anchor="lm")
+            draw.text((spec_x, spec_y), spec_text, fill='black', font=final_font_bold, anchor="lm")
+            draw.text((spec_x + 1, spec_y), spec_text, fill='black', font=final_font_bold, anchor="lm")
+            draw.text((spec_x, spec_y + 1), spec_text, fill='black', font=final_font_bold, anchor="lm")
+            draw.text((spec_x + 1, spec_y + 1), spec_text, fill='black', font=final_font_bold, anchor="lm")
         else:
-            draw.text((500, current_y), line, fill='black', font=final_font, anchor="mm")
+            # 只有品名行：标准粗体渲染
+            draw.text((500, current_y), line, fill='black', font=final_font_bold, anchor="mm")
         
         current_y += line_height
         
@@ -128,7 +129,7 @@ def make_label_50x30(sku, title, spec):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.info("💡 **最新调整**：MADE IN CHINA 回归底部居中。规格参数部分已显著增强加粗。")
+st.info("💡 **权重微调版**：数字部分已调细至中等粗细。层次感：规格 > 品名 > 数字 > 产地标。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
@@ -136,7 +137,7 @@ with col1:
     st.markdown("### 📝 输入商品信息")
     v_sku = st.text_input("货号 (SKU)", "S0033507379541")
     v_title = st.text_input("韩文品名", "[LxU] 용접돋보기 고글형 확대경")
-    v_spec = st.text_input("规格参数 (Option)", "1.00배율 2개입")
+    v_spec = st.text_input("规格参数 (Option)", "1.00배율 2개入")
     
     st.markdown("<br>", unsafe_allow_html=True)
     generate_btn = st.button("🚀 生成高清标签预览", use_container_width=True, type="primary")
@@ -145,7 +146,7 @@ with col2:
     st.markdown("### 🖨️ 预览与下载")
     if generate_btn or 'l_img' not in st.session_state:
         if v_sku and v_title:
-            with st.spinner("正在生成 LxU 标准标签..."):
+            with st.spinner("视觉精修中..."):
                 st.session_state.l_img = make_label_50x30(v_sku, v_title, v_spec)
         else:
             st.warning("请填写完整的 SKU 和品名！")
