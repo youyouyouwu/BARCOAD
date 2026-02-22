@@ -10,8 +10,8 @@ import os
 def make_label_50x30(sku, title, spec):
     """
     生成 LxU 专属 50x30mm 高清标签 (智能三行版)
-    - 支持 1-3 行自适应切换，防止长标题字体过小
-    - 维持 SKU(中等)、品名(粗体)、规格(超粗)的权重层级
+    - 优先切分三行以维持大字号
+    - 字号缩放下限参考入库码数字大小 (约60-68号)
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
@@ -41,39 +41,39 @@ def make_label_50x30(sku, title, spec):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    # 入库码数字：常规体双层叠加 (保持清秀但清晰)
+    # 入库码数字：双层渲染 (视觉参考线：约68号)
     f_sku = load_font(68, is_bold=False)
     sku_pos = (500, 270)
     draw.text(sku_pos, sku, fill='black', font=f_sku, anchor="mm")
     draw.text((sku_pos[0] + 1, sku_pos[1]), sku, fill='black', font=f_sku, anchor="mm")
 
-    # --- 2. 底部声明区 ---
-    # MADE IN CHINA 保持底部中心，字号 32
+    # --- 2. 底部声明区 (居中细体) ---
     f_bottom = load_font(32, is_bold=False)
     draw.text((500, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
-    # --- 3. 核心信息区 (智能 1-3 行排版) ---
+    # --- 3. 核心信息区 (智能 1-3 行逻辑) ---
     display_text = title
     if spec.strip():
         display_text = f"{title} / {spec.strip()}"
     
-    max_text_width = 900 # 稍微放宽一点边距
+    max_text_width = 900 
     font_size = 78 # 起步大字号
     wrapped_lines = []
     final_font_bold = None
 
-    while font_size > 20:
-        f_test_bold = load_font(font_size, is_bold=True)
-        def get_w(t): return draw.textbbox((0,0), t, font=f_test_bold)[2]
+    # 💡 核心优化算法：优先增加行数，其次缩小字号
+    while font_size > 55: # 设置软底限，不让字缩得太厉害
+        f_test = load_font(font_size, is_bold=True)
+        def get_w(t): return draw.textbbox((0,0), t, font=f_test)[2]
         words = display_text.split()
         
-        # 尝试 1: 单行直接装下
+        # 尝试 1: 单行
         if get_w(display_text) <= max_text_width:
             wrapped_lines = [display_text]
-            final_font_bold = f_test_bold
+            final_font_bold = f_test
             break
             
-        # 尝试 2: 智能切分两行
+        # 尝试 2: 两行均衡切分
         best_2_split = None
         for i in range(1, len(words)):
             l1, l2 = " ".join(words[:i]), " ".join(words[i:])
@@ -83,37 +83,35 @@ def make_label_50x30(sku, title, spec):
                     best_2_split = (diff, [l1, l2])
         if best_2_split:
             wrapped_lines = best_2_split[1]
-            final_font_bold = f_test_bold
+            final_font_bold = f_test
             break
 
-        # 尝试 3: 💡 新增：智能切分三行 (保持大字号的关键)
+        # 尝试 3: 💡 三行均衡切分 (维持字号的关键步)
         best_3_split = None
         n = len(words)
         for i in range(1, n - 1):
             for j in range(i + 1, n):
                 l1, l2, l3 = " ".join(words[:i]), " ".join(words[i:j]), " ".join(words[j:])
                 if get_w(l1) <= max_text_width and get_w(l2) <= max_text_width and get_w(l3) <= max_text_width:
-                    # 寻找视觉上最均衡的切分点
                     w1, w2, w3 = get_w(l1), get_w(l2), get_w(l3)
                     diff = max(w1, w2, w3) - min(w1, w2, w3)
                     if best_3_split is None or diff < best_3_split[0]:
                         best_3_split = (diff, [l1, l2, l3])
         if best_3_split:
             wrapped_lines = best_3_split[1]
-            final_font_bold = f_test_bold
+            final_font_bold = f_test
             break
             
-        # 若三行在大字号下都装不下，则缩小字号循环
+        # 如果当前字号下三行也塞不下，才缩小字号
         font_size -= 2 
 
-    if not wrapped_lines: # 极端保底
-        final_font_bold = load_font(30, is_bold=True)
-        wrapped_lines = [display_text]
+    if not wrapped_lines: # 极端保底逻辑
+        final_font_bold = load_font(font_size, is_bold=True)
+        wrapped_lines = [display_text[:20], display_text[20:40], display_text[40:60]]
 
-    # --- 渲染逻辑 ---
-    # 调整行间距为 1.10，确保三行也能在中心区域完美展示
-    line_height = int(font_size * 1.10)
-    center_y_area = 422 # 理论视觉中心
+    # 💡 行间距收缩至 1.08，给三行留足空间
+    line_height = int(font_size * 1.08)
+    center_y_area = 422 
     start_y = center_y_area - ((len(wrapped_lines) * line_height) / 2) + (line_height / 2)
 
     current_y = start_y
@@ -128,7 +126,6 @@ def make_label_50x30(sku, title, spec):
             slash_w = draw.textbbox((0,0), name_text, font=final_font_bold)[2]
             spec_text = " / " + parts[1]
             sp_pos = (start_x + slash_w, current_y)
-            # 渲染四次实现超粗体
             for dx, dy in [(0,0), (1,0), (0,1), (1,1)]:
                 draw.text((sp_pos[0]+dx, sp_pos[1]+dy), spec_text, fill='black', font=final_font_bold, anchor="lm")
         else:
@@ -142,7 +139,7 @@ def make_label_50x30(sku, title, spec):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.info("💡 **深度排版优化**：自动支持三行自适应，长商品名也能保持大字号清晰打印。")
+st.info("💡 **排版深度优化**：长标题自动开启三行模式，字号保底在入库码大小左右，确保清晰打印。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
