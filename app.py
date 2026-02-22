@@ -9,9 +9,10 @@ import os
 
 def make_label_50x30(sku, title, spec):
     """
-    生成 LxU 专属 50x30mm 高清标签 (规格增强版)
-    - 自动添加斜杠区分品名与规格
-    - 规格部分采用更醒目的视觉处理
+    生成 LxU 专属 50x30mm 高清标签 (视觉权重优化版)
+    - SKU/品名：中等粗细 (Medium)
+    - 规格：最粗 (Boldest)
+    - 底部：常规 (Regular)
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
@@ -31,7 +32,7 @@ def make_label_50x30(sku, title, spec):
             if os.path.exists(p): return ImageFont.truetype(p, size)
         return ImageFont.load_default()
 
-    # --- 1. 顶部条形码与SKU (保持优化后的紧凑布局) ---
+    # --- 1. 顶部条形码与SKU ---
     try:
         code_factory = barcode.get_barcode_class('code128')
         c128 = code_factory(sku, writer=ImageWriter())
@@ -41,25 +42,31 @@ def make_label_50x30(sku, title, spec):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    f_sku = load_font(68, is_bold=True)
-    f_bottom = load_font(42)
-    draw.text((500, 285), sku, fill='black', font=f_sku, anchor="mm")
+    # 💡 关键：加载 Regular 字体，后续通过 draw 技巧控制粗细
+    f_sku = load_font(68, is_bold=False)
+    f_bottom = load_font(42, is_bold=False)
+    
+    # 绘制 SKU 数字 (中等粗细：双层叠加)
+    sku_pos = (500, 285)
+    draw.text(sku_pos, sku, fill='black', font=f_sku, anchor="mm")
+    draw.text((sku_pos[0]+1, sku_pos[1]), sku, fill='black', font=f_sku, anchor="mm")
+
+    # 绘制底部 (最细：单层)
     draw.text((500, 570), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
-    # --- 2. 智能文本构建 (自动加斜杠) ---
-    # 如果有规格，则加上斜杠空间
+    # --- 2. 智能文本构建 ---
     display_text = title
     if spec.strip():
         display_text = f"{title} / {spec.strip()}"
     
     max_text_width = 880 
-    font_size = 78 # 起始字体大小
+    font_size = 78 
     wrapped_lines = []
     final_font = None
 
-    # 智能寻找最佳折行点和字体大小
     while font_size > 22:
-        f_test = load_font(font_size, is_bold=True)
+        # 💡 使用 Regular 字体进行宽度计算和最终渲染
+        f_test = load_font(font_size, is_bold=False)
         def get_w(t): return draw.textbbox((0,0), t, font=f_test)[2]
         
         if get_w(display_text) <= max_text_width:
@@ -82,40 +89,39 @@ def make_label_50x30(sku, title, spec):
             break
         font_size -= 2 
 
-    if not wrapped_lines: # 极端情况
-        final_font = load_font(30, is_bold=True)
+    if not wrapped_lines:
+        final_font = load_font(30, is_bold=False)
         wrapped_lines = [display_text]
 
-    # --- 3. 绘制标题 (带规格辨识增强) ---
+    # --- 3. 绘制标题 (精准控制粗细层级) ---
     line_height = int(font_size * 1.35)
     center_y_area = 425 
     start_y = center_y_area - ((len(wrapped_lines) * line_height) / 2) + (line_height / 2)
 
     current_y = start_y
     for line in wrapped_lines:
-        # 💡 特殊逻辑：检查这一行是否包含规格部分 (斜杠后的内容)
         if " / " in line:
             parts = line.split(" / ", 1)
-            # 先算总宽度
             total_w = draw.textbbox((0,0), line, font=final_font)[2]
-            # 从左侧开始绘制
             start_x = 500 - (total_w / 2)
             
-            # 绘制品名部分
-            draw.text((start_x, current_y), parts[0], fill='black', font=final_font, anchor="lm")
+            # 💡 产品名称 (中等粗细：双层叠加)
+            name_text = parts[0]
+            draw.text((start_x, current_y), name_text, fill='black', font=final_font, anchor="lm")
+            draw.text((start_x+1, current_y), name_text, fill='black', font=final_font, anchor="lm")
             
-            # 绘制斜杠和规格
-            slash_and_spec = " / " + parts[1]
-            slash_w = draw.textbbox((0,0), parts[0], font=final_font)[2]
+            slash_w = draw.textbbox((0,0), name_text, font=final_font)[2]
             
-            # 重点：通过微位移重复绘制，让规格部分显得比品名更粗、更黑
-            spec_pos = (start_x + slash_w, current_y)
-            draw.text(spec_pos, slash_and_spec, fill='black', font=final_font, anchor="lm")
-            # 模拟加粗效果 (Offset drawing)
-            draw.text((spec_pos[0]+1, spec_pos[1]), slash_and_spec, fill='black', font=final_font, anchor="lm")
+            # 💡 规格参数 (最粗：三层叠加)
+            spec_text = " / " + parts[1]
+            spec_x = start_x + slash_w
+            draw.text((spec_x, current_y), spec_text, fill='black', font=final_font, anchor="lm")
+            draw.text((spec_x+1, current_y), spec_text, fill='black', font=final_font, anchor="lm")
+            draw.text((spec_x, current_y+1), spec_text, fill='black', font=final_font, anchor="lm")
         else:
-            # 如果这行没斜杠，正常居中绘制
+            # 整行没有规格时，默认中等粗细
             draw.text((500, current_y), line, fill='black', font=final_font, anchor="mm")
+            draw.text((501, current_y), line, fill='black', font=final_font, anchor="mm")
         
         current_y += line_height
         
@@ -126,7 +132,7 @@ def make_label_50x30(sku, title, spec):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.info("💡 **规格强化版**：品名与规格间自动插入斜杠 `/`。规格部分视觉加粗，更易辨认。")
+st.info("💡 **粗细层级优化**：SKU与品名微调为中等粗细，规格保持最粗，底部保持最细。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
