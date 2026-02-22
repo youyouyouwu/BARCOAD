@@ -9,10 +9,10 @@ import os
 
 def make_label_50x30(sku, title, spec):
     """
-    生成 LxU 专属 50x30mm 高清标签 (最终布局版)
+    生成 LxU 专属 50x30mm 高清标签 (低调布局版)
     - 扫码区：数字下移至 270，紧贴但不重叠
     - 信息区：行距 1.12，规格最厚，品名中等
-    - 声明区：MADE IN CHINA 移至右下角
+    - 声明区：MADE IN CHINA 移至左下角，降低视觉权重
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
@@ -42,15 +42,15 @@ def make_label_50x30(sku, title, spec):
         img.paste(b_img, (50, 20)) 
     except: pass
 
-    # SKU：位置定在 270，确保紧凑且不重叠
+    # SKU：保持紧凑不重叠布局
     f_sku = load_font(68, is_bold=True)
     draw.text((500, 270), sku, fill='black', font=f_sku, anchor="mm")
 
-    # --- 💡 板块三：底部声明区 (右下角对齐) ---
-    # 💡 核心修改：按照标记位置，移动到右侧边缘 (X=950)，保持高度 (Y=575)
-    # anchor="rm" 表示以文本右边缘中心点对齐
+    # --- 💡 板块三：底部声明区 (左下角对齐) ---
+    # 💡 核心修改：从 X=950 移动到 X=50，实现左侧隐蔽安置
+    # anchor="lm" 表示以文本左边缘中心点对齐，字号保持 32 号最细
     f_bottom = load_font(32, is_bold=False)
-    draw.text((950, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="rm")
+    draw.text((50, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="lm")
 
     # --- 💡 板块二：核心信息区 (Title / Spec) ---
     display_text = title
@@ -91,7 +91,6 @@ def make_label_50x30(sku, title, spec):
         wrapped_lines = [display_text]
 
     line_height = int(font_size * 1.12)
-    # 适当调整垂直居中基准点
     center_y_area = 420 
     start_y = center_y_area - ((len(wrapped_lines) * line_height) / 2) + (line_height / 2)
 
@@ -126,7 +125,7 @@ def make_label_50x30(sku, title, spec):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.info("💡 **布局终极版**：MADE IN CHINA 已成功落位右下角。核心区域视觉比例已调校至最佳。")
+st.info("💡 **布局终极版**：MADE IN CHINA 已成功移至左下角。该位置更为低调，整体视觉重心完全集中在商品信息上。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
