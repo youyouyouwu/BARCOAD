@@ -9,9 +9,9 @@ import os
 
 def make_label_50x30(sku, title, spec, remark):
     """
-    生成 LxU 专属 50x30mm 高清标签 (环境自适应版)
-    - 字体逻辑：自动适配 Linux(线上) 与 Windows(本地) 路径
-    - 字符集：思源黑体全覆盖，彻底解决方框乱码
+    生成 LxU 专属 50x30mm 高清标签 (备注独立版)
+    - MADE IN CHINA 上移至 Y=535 居中
+    - 仓库备注独占最右下角 (Y=575, 右对齐)，方便后期切割
     """
     width, height = 1000, 600 
     img = Image.new('RGB', (width, height), 'white')
@@ -57,17 +57,17 @@ def make_label_50x30(sku, title, spec, remark):
     f_sku = load_font(68, is_bold=False)
     draw.text((500, 270), sku, fill='black', font=f_sku, anchor="mm")
 
-    # --- 2. 底部声明与仓库备注区 (自适应对齐) ---
+    # --- 2. 底部声明与仓库备注区 (分层布局) ---
     f_bottom = load_font(32, is_bold=False)
     
-    # A. 居中的产地标识
-    draw.text((500, 575), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
+    # A. 居中的产地标识 (上移至 Y=535，不与备注同行)
+    draw.text((500, 535), "MADE IN CHINA", fill='black', font=f_bottom, anchor="mm")
 
-    # B. 仓库备注：使用自适应字体防止乱码
+    # B. 仓库备注 (沉底至 Y=575，右对齐 anchor="rm")
     if remark.strip():
-        draw.text((50, 575), remark, fill='black', font=f_bottom, anchor="lm")
+        draw.text((950, 575), remark, fill='black', font=f_bottom, anchor="rm")
 
-    # --- 3. 核心信息区 (自适应 1-3 行) ---
+    # --- 3. 核心信息区 (自适应 1-3 行，保持不变) ---
     display_text = title
     if spec.strip():
         display_text = f"{title} / {spec.strip()}"
@@ -131,7 +131,7 @@ def make_label_50x30(sku, title, spec, remark):
 st.set_page_config(page_title="LxU 标签生成器", page_icon="🏷️", layout="centered")
 
 st.title("🏷️ LxU 50x30 高清标签生成器")
-st.success("✅ **自适应引擎就绪**：已锁定 Noto Sans CJK/微软雅黑 细体，支持中英韩全字符。")
+st.success("✅ **布局优化**：仓库备注已独立至右下角，与 MADE IN CHINA 分行显示，方便切割。")
 
 col1, col2 = st.columns([1, 1], gap="large")
 
@@ -139,7 +139,7 @@ with col1:
     v_sku = st.text_input("入库码", "S0033507379541")
     v_title = st.text_input("韩文品名", "[LxU] 용접돋보기 고글형 확대경")
     v_spec = st.text_input("规格参数 (Option)", "1.00배율 2개입")
-    v_remark = st.text_input("仓库备注 (例如：绿色)", "绿色") 
+    v_remark = st.text_input("仓库备注 (例如：两个装/绿色)", "两个装/绿色") 
     
     st.markdown("<br>", unsafe_allow_html=True)
     generate_btn = st.button("🚀 生成高清标签预览", use_container_width=True, type="primary")
@@ -152,7 +152,7 @@ with col2:
             st.warning("请填写完整的入库码和品名！")
 
     if 'l_img' in st.session_state:
-        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 智能自适应版)", use_column_width=True)
+        st.image(st.session_state.l_img, caption="1000x600 px (300 DPI 备注独立版)", use_column_width=True)
         # 下载区域 (PNG/PDF)
         p_buf = io.BytesIO(); st.session_state.l_img.save(p_buf, format="PNG", dpi=(300, 300))
         st.download_button("📥 下载标签 (PNG)", p_buf.getvalue(), f"LxU_{v_sku}.png", use_container_width=True)
