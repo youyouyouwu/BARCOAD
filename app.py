@@ -6,6 +6,15 @@ import io
 import os
 
 
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+BUNDLED_FONT_PATH = os.path.join(
+    APP_DIR,
+    "assets",
+    "fonts",
+    "NanumGothic-Regular.ttf",
+)
+
+
 # ================= 1. 核心图像引擎 =================
 
 def make_label_50x30(sku, title, spec, remark):
@@ -31,6 +40,11 @@ def make_label_50x30(sku, title, spec, remark):
     def load_font(size, is_bold=False):
 
         font_candidates = [
+            {
+                # Keep the app independent from Streamlit Cloud's apt installer.
+                "path": BUNDLED_FONT_PATH,
+                "index": 0
+            },
             {
                 "path": "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc",
                 "index": 0
